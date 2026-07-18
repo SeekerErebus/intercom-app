@@ -22,9 +22,15 @@ import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.data.UserPreferences
 import com.homeping.app.discovery.PeerDirectory
 import com.homeping.app.net.ConnectionStatus
+import com.homeping.app.net.PingResponse
 import com.homeping.app.net.SessionRegistry
+import com.homeping.app.ping.OutgoingOutcome
+import com.homeping.app.ping.PingHub
+import com.homeping.app.ping.PingUiState
+import com.homeping.app.service.HomePingService
 import com.homeping.app.service.NotificationPermission
 import com.homeping.app.service.ServiceLifecycle
+import com.homeping.app.ui.IncomingPingScreen
 import com.homeping.app.ui.MainScreen
 import com.homeping.app.ui.settings.SettingsScreen
 import com.homeping.app.ui.settings.SettingsViewModel
@@ -52,6 +58,7 @@ fun HomePingNav() {
     )
     val peers by PeerDirectory.peers.collectAsStateWithLifecycle()
     val linkStatus by SessionRegistry.status.collectAsStateWithLifecycle()
+    val pingState by PingHub.state.collectAsStateWithLifecycle()
 
     var ready by remember { mutableStateOf(false) }
     LaunchedEffect(repository) {
@@ -78,6 +85,17 @@ fun HomePingNav() {
         } else {
             ServiceLifecycle.sync(context, setupComplete = true)
         }
+    }
+
+    // Full-screen incoming alert takes over the app.
+    val incoming = pingState as? PingUiState.IncomingAlert
+    if (incoming != null) {
+        IncomingPingScreen(
+            fromName = incoming.fromName,
+            onComing = { PingHub.respond(incoming.pingId, PingResponse.Coming) },
+            onDismiss = { PingHub.respond(incoming.pingId, PingResponse.Dismissed) },
+        )
+        return
     }
 
     if (!ready) {
@@ -140,15 +158,40 @@ fun HomePingNav() {
                     stringResource(R.string.status_peer_online, primaryPeer.host)
                 else -> stringResource(R.string.status_looking)
             }
-            // Connected counts as online (green); discovered-only also green; failed soft.
             val showOnline = authenticated != null ||
                 (primaryPeer != null && linkStatus !is ConnectionStatus.Failed)
+            val pingEnabled = authenticated != null &&
+                pingState !is PingUiState.OutgoingRinging
+            val pingResultText = when (val p = pingState) {
+                is PingUiState.OutgoingRinging ->
+                    stringResource(R.string.ping_status_ringing, p.peerName)
+                is PingUiState.OutgoingResult -> when (p.outcome) {
+                    OutgoingOutcome.Coming ->
+                        stringResource(R.string.ping_status_coming, p.peerName)
+                    OutgoingOutcome.Dismissed ->
+                        stringResource(R.string.ping_status_dismissed, p.peerName)
+                    OutgoingOutcome.Timeout ->
+                        stringResource(R.string.ping_status_timeout)
+                    OutgoingOutcome.Failed ->
+                        stringResource(R.string.ping_status_failed)
+                    OutgoingOutcome.Cancelled ->
+                        stringResource(R.string.ping_status_cancelled)
+                }
+                else -> null
+            }
             MainScreen(
                 peerName = peerName,
                 statusText = statusText,
                 peerOnline = showOnline && peerOnline,
                 thisDeviceName = displayName,
-                onPingClick = { /* PR6 */ },
+                pingEnabled = pingEnabled,
+                pingResultText = pingResultText,
+                onPingClick = {
+                    // Prefer in-process hub; fall back to service intent.
+                    if (!PingHub.sendPing(peerName)) {
+                        HomePingService.requestSendPing(context)
+                    }
+                },
                 onSettingsClick = {
                     navController.navigate(Routes.SETTINGS)
                 },

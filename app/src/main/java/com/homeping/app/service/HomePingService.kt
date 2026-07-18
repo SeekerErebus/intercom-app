@@ -11,10 +11,12 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.homeping.app.alert.HomePingNotifications
 import com.homeping.app.alert.NotificationChannels
+import com.homeping.app.alert.PingAlerter
 import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.discovery.NsdPeerDiscovery
 import com.homeping.app.net.SessionManager
 import com.homeping.app.net.SessionRegistry
+import com.homeping.app.ping.PingHub
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,7 +25,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Foreground service: ready notification, mDNS discovery, TCP session + PIN auth.
+ * Foreground service: ready notification, discovery, TCP session, and pings.
  */
 class HomePingService : Service() {
 
@@ -34,10 +36,12 @@ class HomePingService : Service() {
     private var lastDeviceId: String = ""
     private var lastDisplayName: String = ""
     private var lastPin: String = ""
+    private lateinit var pingAlerter: PingAlerter
 
     override fun onCreate() {
         super.onCreate()
         NotificationChannels.ensureCreated(this)
+        pingAlerter = PingAlerter(this)
         Log.i(TAG, "onCreate")
     }
 
@@ -49,6 +53,12 @@ class HomePingService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_SEND_PING -> {
+                promoteToForeground()
+                ensurePrefsWatching()
+                val ok = sessionManager?.sendPing() == true
+                Log.i(TAG, "send ping requested ok=$ok")
             }
             else -> {
                 promoteToForeground()
@@ -82,7 +92,6 @@ class HomePingService : Service() {
             @Suppress("DEPRECATION")
             startForeground(HomePingNotifications.SERVICE_NOTIFICATION_ID, notification)
         }
-        Log.i(TAG, "foreground started")
     }
 
     private fun ensurePrefsWatching() {
@@ -117,6 +126,12 @@ class HomePingService : Service() {
                         onPaired = { peerId, peerName ->
                             repo.setPairedPeer(peerId, peerName)
                         },
+                        onIncomingAlert = { pingId, fromName ->
+                            pingAlerter.showIncoming(pingId, fromName)
+                        },
+                        onIncomingCleared = {
+                            pingAlerter.clearAll()
+                        },
                     ).also {
                         it.start(
                             selfDeviceId = prefs.deviceId,
@@ -144,16 +159,19 @@ class HomePingService : Service() {
     }
 
     private fun tearDownNetworking() {
+        pingAlerter.clearAll()
         sessionManager?.stop()
         sessionManager = null
         discovery?.stop()
         discovery = null
         SessionRegistry.reset()
+        PingHub.detach()
     }
 
     companion object {
         private const val TAG = "HomePingService"
         const val ACTION_STOP = "com.homeping.app.action.STOP_SERVICE"
+        const val ACTION_SEND_PING = "com.homeping.app.action.SEND_PING"
 
         fun start(context: Context) {
             NotificationChannels.ensureCreated(context)
@@ -170,6 +188,13 @@ class HomePingService : Service() {
             } catch (_: Exception) {
                 context.stopService(Intent(context, HomePingService::class.java))
             }
+        }
+
+        fun requestSendPing(context: Context) {
+            val intent = Intent(context, HomePingService::class.java).apply {
+                action = ACTION_SEND_PING
+            }
+            ContextCompat.startForegroundService(context, intent)
         }
 
         fun isPermissionReady(context: Context): Boolean {

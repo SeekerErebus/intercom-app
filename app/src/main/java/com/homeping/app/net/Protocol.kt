@@ -7,6 +7,17 @@ object Protocol {
     const val MAX_FRAME_BYTES = 64 * 1024
 }
 
+enum class PingResponse(val wire: String) {
+    Coming("coming"),
+    Dismissed("dismissed"),
+    ;
+
+    companion object {
+        fun fromWire(value: String): PingResponse? =
+            entries.firstOrNull { it.wire.equals(value, ignoreCase = true) }
+    }
+}
+
 sealed class ProtocolMessage {
     abstract val type: String
 
@@ -44,6 +55,34 @@ sealed class ProtocolMessage {
         override val type: String = TYPE_PRESENCE
     }
 
+    data class Ping(
+        val pingId: String,
+        val fromDeviceId: String,
+        val fromName: String,
+        val timestampMs: Long,
+    ) : ProtocolMessage() {
+        override val type: String = TYPE_PING
+    }
+
+    data class PingDelivered(
+        val pingId: String,
+    ) : ProtocolMessage() {
+        override val type: String = TYPE_PING_DELIVERED
+    }
+
+    data class PingAck(
+        val pingId: String,
+        val response: PingResponse,
+    ) : ProtocolMessage() {
+        override val type: String = TYPE_PING_ACK
+    }
+
+    data class PingCancel(
+        val pingId: String,
+    ) : ProtocolMessage() {
+        override val type: String = TYPE_PING_CANCEL
+    }
+
     /** Opaque / future messages kept for forward compatibility. */
     data class Unknown(
         val rawType: String,
@@ -73,6 +112,22 @@ sealed class ProtocolMessage {
             is Presence -> JSONObject()
                 .put("type", type)
                 .put("deviceId", deviceId)
+            is Ping -> JSONObject()
+                .put("type", type)
+                .put("pingId", pingId)
+                .put("fromDeviceId", fromDeviceId)
+                .put("fromName", fromName)
+                .put("timestamp", timestampMs)
+            is PingDelivered -> JSONObject()
+                .put("type", type)
+                .put("pingId", pingId)
+            is PingAck -> JSONObject()
+                .put("type", type)
+                .put("pingId", pingId)
+                .put("response", response.wire)
+            is PingCancel -> JSONObject()
+                .put("type", type)
+                .put("pingId", pingId)
             is Unknown -> json
         }
     }
@@ -103,6 +158,19 @@ sealed class ProtocolMessage {
                 TYPE_AUTH_OK -> AuthOk(deviceId = json.getString("deviceId"))
                 TYPE_AUTH_FAIL -> AuthFail(reason = json.optString("reason", "rejected"))
                 TYPE_PRESENCE -> Presence(deviceId = json.optString("deviceId"))
+                TYPE_PING -> Ping(
+                    pingId = json.getString("pingId"),
+                    fromDeviceId = json.optString("fromDeviceId"),
+                    fromName = json.optString("fromName"),
+                    timestampMs = json.optLong("timestamp", System.currentTimeMillis()),
+                )
+                TYPE_PING_DELIVERED -> PingDelivered(pingId = json.getString("pingId"))
+                TYPE_PING_ACK -> {
+                    val response = PingResponse.fromWire(json.optString("response"))
+                        ?: PingResponse.Dismissed
+                    PingAck(pingId = json.getString("pingId"), response = response)
+                }
+                TYPE_PING_CANCEL -> PingCancel(pingId = json.getString("pingId"))
                 else -> Unknown(rawType = type, json = json)
             }
         }

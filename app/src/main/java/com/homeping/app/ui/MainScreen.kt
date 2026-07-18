@@ -31,16 +31,14 @@ import com.homeping.app.ui.theme.HomePingOffline
 import com.homeping.app.ui.theme.HomePingOnline
 import com.homeping.app.ui.theme.HomePingTheme
 
-/**
- * Daily home screen. Peer online state comes from LAN discovery (PR4);
- * Ping remains disabled until transport lands.
- */
 @Composable
 fun MainScreen(
     peerName: String = stringResource(R.string.peer_placeholder),
     statusText: String = stringResource(R.string.status_not_connected),
     peerOnline: Boolean = false,
     thisDeviceName: String = "",
+    pingEnabled: Boolean = false,
+    pingResultText: String? = null,
     onPingClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
@@ -75,13 +73,22 @@ fun MainScreen(
                     statusText = statusText,
                     peerOnline = peerOnline,
                 )
+                if (!pingResultText.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = pingResultText,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
 
             val pingLabel = stringResource(R.string.ping_button)
             val pingHint = stringResource(R.string.ping_button_hint)
             Button(
                 onClick = onPingClick,
-                enabled = false,
+                enabled = pingEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp)
@@ -102,7 +109,11 @@ fun MainScreen(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = stringResource(R.string.main_networking_note),
+                    text = if (pingEnabled) {
+                        stringResource(R.string.main_ping_ready_note)
+                    } else {
+                        stringResource(R.string.main_networking_note)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -162,8 +173,10 @@ private fun MainScreenPreview() {
         MainScreen(
             thisDeviceName = "Upstairs",
             peerName = "Downstairs",
-            statusText = "Seen on Wi‑Fi",
+            statusText = "Connected",
             peerOnline = true,
+            pingEnabled = true,
+            pingResultText = "They said Coming!",
         )
     }
 }

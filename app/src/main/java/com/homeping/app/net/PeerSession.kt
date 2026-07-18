@@ -157,6 +157,10 @@ class PeerSession(
                 close("peer rejected auth: ${msg.reason}")
             }
             is ProtocolMessage.Presence,
+            is ProtocolMessage.Ping,
+            is ProtocolMessage.PingDelivered,
+            is ProtocolMessage.PingAck,
+            is ProtocolMessage.PingCancel,
             is ProtocolMessage.Unknown,
             -> {
                 if (authAnnounced) {
@@ -165,6 +169,8 @@ class PeerSession(
             }
         }
     }
+
+    fun isAuthenticated(): Boolean = authAnnounced
 
     private fun maybeAnnounceAuthenticated() {
         if (authAnnounced) return

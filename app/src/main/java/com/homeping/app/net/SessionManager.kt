@@ -4,6 +4,8 @@ import android.util.Log
 import com.homeping.app.discovery.DiscoveredPeer
 import com.homeping.app.discovery.DiscoveryConstants
 import com.homeping.app.discovery.PeerDirectory
+import com.homeping.app.ping.PingController
+import com.homeping.app.ping.PingHub
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,12 +23,13 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Listens for inbound HomePing TCP sessions and dials discovered peers.
- * Two-device policy: the lexicographically smaller deviceId dials to avoid
- * duplicate connections; the larger waits for inbound.
+ * Owns the authenticated [PeerSession] and [PingController].
  */
 class SessionManager(
     private val scope: CoroutineScope,
     private val onPaired: suspend (peerId: String, peerName: String) -> Unit,
+    private val onIncomingAlert: (pingId: String, fromName: String) -> Unit,
+    private val onIncomingCleared: (pingId: String) -> Unit,
 ) {
     private val running = AtomicBoolean(false)
     private val sessionMutex = Mutex()
@@ -38,8 +41,10 @@ class SessionManager(
 
     private var serverJob: Job? = null
     private var peerWatchJob: Job? = null
+    private var pingMirrorJob: Job? = null
     private var serverSocket: ServerSocket? = null
     private var activeSession: PeerSession? = null
+    private var pingController: PingController? = null
 
     private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Idle)
     val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
@@ -57,6 +62,7 @@ class SessionManager(
         if (!running.compareAndSet(false, true)) {
             return
         }
+        rebuildPingController()
         publish(ConnectionStatus.Listening)
         startServer()
         watchPeers()
@@ -67,12 +73,17 @@ class SessionManager(
         selfDisplayName = displayName
         this.homePin = homePin
         this.preferredPeerId = preferredPeerId
+        pingController?.updatePeerName(
+            (status.value as? ConnectionStatus.Authenticated)?.peerName.orEmpty(),
+        )
     }
 
     fun stop() {
         if (!running.compareAndSet(true, false)) return
         peerWatchJob?.cancel()
         peerWatchJob = null
+        pingMirrorJob?.cancel()
+        pingMirrorJob = null
         serverJob?.cancel()
         serverJob = null
         try {
@@ -82,12 +93,49 @@ class SessionManager(
         serverSocket = null
         scope.launch {
             sessionMutex.withLock {
+                pingController?.reset()
+                pingController = null
                 activeSession?.close("manager stop")
                 activeSession = null
             }
+            PingHub.detach()
         }
         publish(ConnectionStatus.Idle)
         Log.i(TAG, "SessionManager stopped")
+    }
+
+    fun sendPing(): Boolean {
+        val auth = _status.value as? ConnectionStatus.Authenticated ?: return false
+        val controller = pingController ?: return false
+        controller.updatePeerName(auth.peerName)
+        return controller.sendPing(auth.peerName)
+    }
+
+    private fun rebuildPingController() {
+        pingMirrorJob?.cancel()
+        val controller = PingController(
+            scope = scope,
+            selfDeviceId = selfDeviceId,
+            selfDisplayName = selfDisplayName,
+            send = { msg -> sendOnSession(msg) },
+            onIncomingAlert = onIncomingAlert,
+            onIncomingCleared = onIncomingCleared,
+        )
+        pingController = controller
+        PingHub.attach(controller) {
+            activeSession?.isAuthenticated() == true &&
+                _status.value is ConnectionStatus.Authenticated
+        }
+        pingMirrorJob = scope.launch {
+            controller.state.collect { PingHub.publish(it) }
+        }
+    }
+
+    private fun sendOnSession(message: ProtocolMessage): Boolean {
+        val session = activeSession
+        if (session == null || !session.isAuthenticated()) return false
+        session.send(message)
+        return true
     }
 
     private fun publish(status: ConnectionStatus) {
@@ -149,7 +197,6 @@ class SessionManager(
         }
 
         val candidate = selectDialCandidate(peers) ?: return
-        // Lower deviceId dials; higher waits for inbound.
         if (selfDeviceId >= candidate.deviceId) {
             return
         }
@@ -179,6 +226,7 @@ class SessionManager(
                 scope = scope,
                 onAuthenticated = { id, name -> onSessionAuthenticated(id, name) },
                 onClosed = { reason -> onSessionClosed(reason) },
+                onProtocolMessage = { msg -> pingController?.handleRemote(msg) },
             )
             sessionMutex.withLock {
                 if (activeSession != null) {
@@ -215,6 +263,7 @@ class SessionManager(
                 scope = scope,
                 onAuthenticated = { id, name -> onSessionAuthenticated(id, name) },
                 onClosed = { reason -> onSessionClosed(reason) },
+                onProtocolMessage = { msg -> pingController?.handleRemote(msg) },
             )
             activeSession = session
             session.start()
@@ -224,6 +273,7 @@ class SessionManager(
     private fun onSessionAuthenticated(peerId: String, peerName: String) {
         preferredPeerId = peerId
         val host = activeSession?.remoteHost.orEmpty()
+        pingController?.updatePeerName(peerName)
         publish(ConnectionStatus.Authenticated(peerId, peerName, host))
         scope.launch {
             try {
@@ -237,6 +287,7 @@ class SessionManager(
     private fun onSessionClosed(reason: String) {
         scope.launch {
             sessionMutex.withLock {
+                pingController?.reset()
                 activeSession = null
             }
             if (running.get()) {

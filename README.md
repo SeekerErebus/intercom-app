@@ -10,7 +10,7 @@ Design notes live in [`notes/`](notes/), especially [`notes/design.md`](notes/de
 
 ## Status
 
-PR5 — TCP control plane on port 7529 with shared-PIN auth. After discovery, phones link automatically (lower device id dials). Main shows **Connected to …** when auth succeeds.
+PR6 — End-to-end **Ping** with Coming/Dismissed. High-priority notification + in-app alert; sender sees ringing / Coming / Dismissed / timeout.
 
 ## Requirements
 
@@ -73,6 +73,8 @@ notes/                         # product & design docs
 3. Same **home** Wi‑Fi (not guest / client isolation).
 4. Main should move: Looking → Seen on Wi‑Fi → Checking home PIN → **Connected to …**.
 5. Wrong PIN on one phone → auth fails / no Connected state.
+6. When **Connected**, tap **Ping** on one phone → other gets a loud notification + full-screen **Coming / Dismiss**.
+7. Sender should show **They said Coming!** or **dismissed** / **No response**.
 
 
 ## Implementation plan (summary)

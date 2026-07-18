@@ -11,6 +11,9 @@ import com.homeping.app.R
 object HomePingNotifications {
     const val SERVICE_NOTIFICATION_ID = 1001
     const val PING_NOTIFICATION_ID = 1002
+    const val EXTRA_PING_ID = "ping_id"
+    const val EXTRA_FROM_NAME = "from_name"
+    const val EXTRA_OPEN_INCOMING = "open_incoming"
 
     fun serviceReady(context: Context): Notification {
         val openApp = activityPendingIntent(context, requestCode = 1)
@@ -27,9 +30,6 @@ object HomePingNotifications {
             .build()
     }
 
-    /**
-     * Scaffold for incoming pings (used once transport/ping PRs land).
-     */
     fun incomingPing(
         context: Context,
         fromName: String,
@@ -38,7 +38,23 @@ object HomePingNotifications {
         val openApp = activityPendingIntent(
             context,
             requestCode = 2,
-            extras = mapOf(EXTRA_PING_ID to pingId),
+            extras = mapOf(
+                EXTRA_PING_ID to pingId,
+                EXTRA_FROM_NAME to fromName,
+                EXTRA_OPEN_INCOMING to "1",
+            ),
+        )
+        val coming = broadcastPendingIntent(
+            context,
+            requestCode = 3,
+            action = PingActionReceiver.ACTION_COMING,
+            pingId = pingId,
+        )
+        val dismiss = broadcastPendingIntent(
+            context,
+            requestCode = 4,
+            action = PingActionReceiver.ACTION_DISMISS,
+            pingId = pingId,
         )
         return NotificationCompat.Builder(context, NotificationChannels.PING_ALERTS)
             .setSmallIcon(R.drawable.ic_notification)
@@ -49,21 +65,11 @@ object HomePingNotifications {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(
-                0,
-                context.getString(R.string.notif_ping_coming),
-                // Actions wired to receivers in the ping PR.
-                activityPendingIntent(context, requestCode = 3, extras = mapOf(EXTRA_PING_ID to pingId)),
-            )
-            .addAction(
-                0,
-                context.getString(R.string.notif_ping_dismiss),
-                activityPendingIntent(context, requestCode = 4, extras = mapOf(EXTRA_PING_ID to pingId)),
-            )
+            .setOnlyAlertOnce(false)
+            .addAction(0, context.getString(R.string.notif_ping_coming), coming)
+            .addAction(0, context.getString(R.string.notif_ping_dismiss), dismiss)
             .build()
     }
-
-    const val EXTRA_PING_ID = "ping_id"
 
     private fun activityPendingIntent(
         context: Context,
@@ -75,6 +81,24 @@ object HomePingNotifications {
             extras.forEach { (k, v) -> putExtra(k, v) }
         }
         return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun broadcastPendingIntent(
+        context: Context,
+        requestCode: Int,
+        action: String,
+        pingId: String,
+    ): PendingIntent {
+        val intent = Intent(context, PingActionReceiver::class.java).apply {
+            this.action = action
+            putExtra(EXTRA_PING_ID, pingId)
+        }
+        return PendingIntent.getBroadcast(
             context,
             requestCode,
             intent,

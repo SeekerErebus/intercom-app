@@ -40,6 +40,10 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Household LAN intercom: stays ready to receive attention pings from a paired phone on the same Wi-Fi." />
         </service>
+
+        <receiver
+            android:name=".alert.PingActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

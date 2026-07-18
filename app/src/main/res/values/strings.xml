@@ -8,7 +8,16 @@
     <string name="ping_button">Ping</string>
     <string name="ping_button_hint">Sends an attention alert to the other phone on your home Wi‑Fi</string>
     <string name="settings">Settings</string>
-    <string name="main_networking_note">Ping button comes next — connection uses your home PIN</string>
+    <string name="main_networking_note">Wait until Connected, then you can Ping</string>
+    <string name="main_ping_ready_note">Tap Ping when you need their attention</string>
+    <string name="ping_status_ringing">Ringing %1$s…</string>
+    <string name="ping_status_coming">%1$s said Coming!</string>
+    <string name="ping_status_dismissed">%1$s dismissed</string>
+    <string name="ping_status_timeout">No response</string>
+    <string name="ping_status_failed">Couldn\'t reach them. Check Wi‑Fi.</string>
+    <string name="ping_status_cancelled">Ping cancelled</string>
+    <string name="incoming_title">Needs you</string>
+    <string name="incoming_body">Tap Coming if you are on your way, or Dismiss if not now.</string>
     <string name="status_looking">Looking for the other phone on Wi‑Fi…</string>
     <string name="status_peer_online">Seen on Wi‑Fi · %1$s</string>
     <string name="status_connecting">Connecting to %1$s…</string>
@@ -41,7 +50,7 @@
     <string name="settings_pin_help">If you change the PIN, set the same one on the other phone too.</string>
     <string name="settings_save_pin">Save PIN</string>
     <string name="settings_saved">Saved</string>
-    <string name="settings_about">Device id: %1$s… · HomePing 0.5.0</string>
+    <string name="settings_about">Device id: %1$s… · HomePing 0.6.0</string>
     <string name="settings_link_section">Connection</string>
     <string name="settings_link_idle">Not linked yet</string>
     <string name="settings_link_connected">Linked to %1$s</string>
