@@ -34,5 +34,24 @@
     <string name="settings_pin_help">If you change the PIN, set the same one on the other phone too.</string>
     <string name="settings_save_pin">Save PIN</string>
     <string name="settings_saved">Saved</string>
-    <string name="settings_about">Device id: %1$s… · HomePing 0.2.0</string>
+    <string name="settings_about">Device id: %1$s… · HomePing 0.3.0</string>
+    <string name="settings_service_section">Background readiness</string>
+    <string name="settings_service_help">HomePing keeps a quiet notification while it waits for pings. Allow notifications if asked.</string>
+    <string name="settings_service_running">Ready notification should be visible in the shade.</string>
+    <string name="settings_enable_notifications">Allow notifications</string>
+
+    <!-- Notification channels -->
+    <string name="channel_service_name">HomePing is ready</string>
+    <string name="channel_service_description">Quiet ongoing notice while HomePing can receive pings.</string>
+    <string name="channel_ping_name">Attention pings</string>
+    <string name="channel_ping_description">Loud alerts when the other phone pings you.</string>
+
+    <!-- Notifications -->
+    <string name="notif_service_title">HomePing is ready</string>
+    <string name="notif_service_text">Waiting for pings on this phone</string>
+    <string name="notif_ping_title">Ping from %1$s</string>
+    <string name="notif_ping_text">They need your attention</string>
+    <string name="notif_ping_coming">Coming</string>
+    <string name="notif_ping_dismiss">Dismiss</string>
 </resources>
+

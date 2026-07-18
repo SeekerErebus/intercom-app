@@ -1,5 +1,9 @@
 package com.homeping.app.ui.navigation
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.data.UserPreferences
+import com.homeping.app.service.NotificationPermission
+import com.homeping.app.service.ServiceLifecycle
 import com.homeping.app.ui.MainScreen
 import com.homeping.app.ui.settings.SettingsScreen
 import com.homeping.app.ui.settings.SettingsViewModel
@@ -46,6 +52,27 @@ fun HomePingNav() {
         ready = true
     }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        ServiceLifecycle.sync(context, setupComplete = prefs.setupComplete)
+    }
+
+    LaunchedEffect(ready, prefs.setupComplete) {
+        if (!ready || !prefs.setupComplete) {
+            if (ready && !prefs.setupComplete) {
+                ServiceLifecycle.sync(context, setupComplete = false)
+            }
+            return@LaunchedEffect
+        }
+        val needed = NotificationPermission.requiredPermissionOrNull()
+        if (needed != null && !NotificationPermission.hasPostNotifications(context)) {
+            permissionLauncher.launch(needed)
+        } else {
+            ServiceLifecycle.sync(context, setupComplete = true)
+        }
+    }
+
     if (!ready) {
         return
     }
@@ -75,7 +102,11 @@ fun HomePingNav() {
             MainScreen(
                 peerName = prefs.pairedPeerName.takeIf { it.isNotBlank() } ?: "Other phone",
                 statusText = if (prefs.setupComplete) {
-                    "Ready on this phone as $displayName. Pairing comes next."
+                    if (NotificationPermission.hasPostNotifications(context)) {
+                        "Ready on this phone as $displayName. Pairing comes next."
+                    } else {
+                        "Allow notifications so HomePing can alert you."
+                    }
                 } else {
                     "Not set up yet"
                 },
@@ -93,6 +124,13 @@ fun HomePingNav() {
             SettingsScreen(
                 viewModel = settingsViewModel,
                 onBack = { navController.popBackStack() },
+                onRequestNotificationPermission = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        ServiceLifecycle.sync(context, setupComplete = prefs.setupComplete)
+                    }
+                },
             )
         }
     }

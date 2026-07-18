@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -26,15 +27,19 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homeping.app.R
+import com.homeping.app.service.NotificationPermission
 import com.homeping.app.ui.components.LargePrimaryButton
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
+    onRequestNotificationPermission: () -> Unit = {},
 ) {
     val form by viewModel.form.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val notificationsOk = NotificationPermission.hasPostNotifications(context)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -136,6 +141,34 @@ fun SettingsScreen(
                 text = stringResource(R.string.settings_save_pin),
                 onClick = viewModel::savePin,
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = stringResource(R.string.settings_service_section),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_service_help),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (notificationsOk) {
+                    stringResource(R.string.settings_service_running)
+                } else {
+                    stringResource(R.string.settings_enable_notifications)
+                },
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            if (!notificationsOk) {
+                Spacer(modifier = Modifier.height(12.dp))
+                LargePrimaryButton(
+                    text = stringResource(R.string.settings_enable_notifications),
+                    onClick = onRequestNotificationPermission,
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(
