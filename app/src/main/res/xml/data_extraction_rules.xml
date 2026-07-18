@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude sensitive prefs when backup is added later -->
+    </cloud-backup>
+</data-extraction-rules>
