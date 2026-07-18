@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.homeping.app.ui.MainScreen
+import com.homeping.app.ui.navigation.HomePingNav
 import com.homeping.app.ui.theme.HomePingTheme
 
 class MainActivity : ComponentActivity() {
@@ -22,10 +22,7 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .safeDrawingPadding(),
                 ) {
-                    MainScreen(
-                        onPingClick = { /* wired in ping PR */ },
-                        onSettingsClick = { /* wired in setup/settings PR */ },
-                    )
+                    HomePingNav()
                 }
             }
         }

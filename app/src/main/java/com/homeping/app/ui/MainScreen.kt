@@ -37,6 +37,7 @@ import com.homeping.app.ui.theme.HomePingTheme
 fun MainScreen(
     peerName: String = stringResource(R.string.peer_placeholder),
     statusText: String = stringResource(R.string.status_not_connected),
+    thisDeviceName: String = "",
     onPingClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
@@ -57,6 +58,14 @@ fun MainScreen(
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
+                if (thisDeviceName.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.main_this_device, thisDeviceName),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(modifier = Modifier.height(24.dp))
                 PeerStatusCard(peerName = peerName, statusText = statusText)
             }
@@ -86,7 +95,7 @@ fun MainScreen(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = stringResource(R.string.skeleton_note),
+                    text = stringResource(R.string.main_networking_note),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -141,6 +150,6 @@ private fun PeerStatusCard(
 @Composable
 private fun MainScreenPreview() {
     HomePingTheme {
-        MainScreen()
+        MainScreen(thisDeviceName = "Upstairs")
     }
 }

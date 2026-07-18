@@ -2,10 +2,37 @@
 <resources>
     <string name="app_name">HomePing</string>
     <string name="main_title">HomePing</string>
+    <string name="main_this_device">This phone: %1$s</string>
     <string name="peer_placeholder">Other phone</string>
     <string name="status_not_connected">Not set up yet</string>
     <string name="ping_button">Ping</string>
     <string name="ping_button_hint">Sends an attention alert to the other phone on your home Wi‑Fi</string>
     <string name="settings">Settings</string>
-    <string name="skeleton_note">Skeleton build — networking comes next</string>
+    <string name="main_networking_note">Pairing and ping come in the next steps</string>
+
+    <!-- Setup wizard -->
+    <string name="setup_welcome_title">Welcome to HomePing</string>
+    <string name="setup_welcome_body">Use this app when you are home and need someone on the other floor.\n\nPhone calls stay for when you are away or need to talk.\n\nBoth phones must use the same home Wi‑Fi and the same PIN.</string>
+    <string name="setup_continue">Continue</string>
+    <string name="setup_back">Back</string>
+    <string name="setup_finish">Save and finish</string>
+    <string name="setup_name_title">Name this phone</string>
+    <string name="setup_name_body">Pick a name the other person will recognize, such as Upstairs or Mom\'s phone.</string>
+    <string name="setup_name_label">Phone name</string>
+    <string name="setup_name_suggestions">Suggestions</string>
+    <string name="setup_pin_title">Home PIN</string>
+    <string name="setup_pin_body">Choose a 4–6 digit PIN. Enter the same PIN on the other phone so only your household can connect.</string>
+    <string name="setup_pin_label">PIN</string>
+    <string name="setup_pin_confirm_label">Type PIN again</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_this_phone">This phone: %1$s</string>
+    <string name="settings_name_section">Phone name</string>
+    <string name="settings_save_name">Save name</string>
+    <string name="settings_pin_section">Home PIN</string>
+    <string name="settings_pin_help">If you change the PIN, set the same one on the other phone too.</string>
+    <string name="settings_save_pin">Save PIN</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_about">Device id: %1$s… · HomePing 0.2.0</string>
 </resources>

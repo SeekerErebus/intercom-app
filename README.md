@@ -10,7 +10,7 @@ Design notes live in [`notes/`](notes/), especially [`notes/design.md`](notes/de
 
 ## Status
 
-PR1 — project skeleton. Runnable UI shell; networking not implemented yet.
+PR2 — device identity, DataStore preferences, first-run setup wizard (name + home PIN), settings. Networking not implemented yet.
 
 ## Requirements
 
