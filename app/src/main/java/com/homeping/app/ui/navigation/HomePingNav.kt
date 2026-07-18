@@ -11,13 +11,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.homeping.app.R
 import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.data.UserPreferences
+import com.homeping.app.discovery.PeerDirectory
 import com.homeping.app.service.NotificationPermission
 import com.homeping.app.service.ServiceLifecycle
 import com.homeping.app.ui.MainScreen
@@ -45,6 +48,7 @@ fun HomePingNav() {
             setupComplete = false,
         ),
     )
+    val peers by PeerDirectory.peers.collectAsStateWithLifecycle()
 
     var ready by remember { mutableStateOf(false) }
     LaunchedEffect(repository) {
@@ -79,6 +83,9 @@ fun HomePingNav() {
 
     val navController = rememberNavController()
     val startDestination = if (prefs.setupComplete) Routes.MAIN else Routes.SETUP
+    val primaryPeer = remember(peers, prefs.pairedPeerId) {
+        PeerDirectory.selectPrimary(prefs.pairedPeerId)
+    }
 
     NavHost(
         navController = navController,
@@ -99,17 +106,24 @@ fun HomePingNav() {
         }
         composable(Routes.MAIN) {
             val displayName = prefs.displayName
+            val peerOnline = primaryPeer != null
+            val peerName = primaryPeer?.displayName
+                ?: prefs.pairedPeerName.takeIf { it.isNotBlank() }
+                ?: stringResource(R.string.peer_placeholder)
+            val statusText = when {
+                !prefs.setupComplete -> stringResource(R.string.status_not_connected)
+                !NotificationPermission.hasPostNotifications(context) ->
+                    stringResource(R.string.status_need_notifications)
+                peerOnline -> stringResource(
+                    R.string.status_peer_online,
+                    primaryPeer!!.host,
+                )
+                else -> stringResource(R.string.status_looking)
+            }
             MainScreen(
-                peerName = prefs.pairedPeerName.takeIf { it.isNotBlank() } ?: "Other phone",
-                statusText = if (prefs.setupComplete) {
-                    if (NotificationPermission.hasPostNotifications(context)) {
-                        "Ready on this phone as $displayName. Pairing comes next."
-                    } else {
-                        "Allow notifications so HomePing can alert you."
-                    }
-                } else {
-                    "Not set up yet"
-                },
+                peerName = peerName,
+                statusText = statusText,
+                peerOnline = peerOnline,
                 thisDeviceName = displayName,
                 onPingClick = { /* PR6 */ },
                 onSettingsClick = {
@@ -123,6 +137,7 @@ fun HomePingNav() {
             )
             SettingsScreen(
                 viewModel = settingsViewModel,
+                discoveredPeers = peers,
                 onBack = { navController.popBackStack() },
                 onRequestNotificationPermission = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

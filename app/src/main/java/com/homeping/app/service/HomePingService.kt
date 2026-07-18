@@ -11,13 +11,26 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.homeping.app.alert.HomePingNotifications
 import com.homeping.app.alert.NotificationChannels
+import com.homeping.app.data.PreferencesRepository
+import com.homeping.app.discovery.NsdPeerDiscovery
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Keeps HomePing eligible to run while the user expects pings.
- * Discovery and TCP listeners attach here in later PRs; this PR only owns
- * the foreground lifecycle and ongoing "ready" notification.
+ * Owns the ready notification and LAN peer discovery (NSD).
  */
 class HomePingService : Service() {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var discovery: NsdPeerDiscovery? = null
+    private var prefsJob: Job? = null
+    private var lastDeviceId: String = ""
+    private var lastDisplayName: String = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -29,12 +42,14 @@ class HomePingService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 Log.i(TAG, "stop requested")
+                tearDownDiscovery()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
             else -> {
                 promoteToForeground()
+                ensureDiscoveryWatching()
             }
         }
         return START_STICKY
@@ -43,6 +58,10 @@ class HomePingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        tearDownDiscovery()
+        prefsJob?.cancel()
+        prefsJob = null
+        scope.cancel()
         Log.i(TAG, "onDestroy")
         super.onDestroy()
     }
@@ -63,6 +82,39 @@ class HomePingService : Service() {
         Log.i(TAG, "foreground started")
     }
 
+    private fun ensureDiscoveryWatching() {
+        if (prefsJob != null) return
+        val repo = PreferencesRepository.getInstance(this)
+        prefsJob = scope.launch {
+            repo.preferences.collect { prefs ->
+                if (!prefs.setupComplete || prefs.deviceId.isBlank()) {
+                    tearDownDiscovery()
+                    lastDeviceId = ""
+                    lastDisplayName = ""
+                    return@collect
+                }
+                if (discovery == null || prefs.deviceId != lastDeviceId) {
+                    tearDownDiscovery()
+                    discovery = NsdPeerDiscovery(
+                        context = this@HomePingService,
+                        selfDeviceId = prefs.deviceId,
+                        displayName = prefs.displayName.ifBlank { "HomePing" },
+                    ).also { it.start() }
+                    lastDeviceId = prefs.deviceId
+                    lastDisplayName = prefs.displayName
+                } else if (prefs.displayName != lastDisplayName) {
+                    discovery?.updateDisplayName(prefs.displayName.ifBlank { "HomePing" })
+                    lastDisplayName = prefs.displayName
+                }
+            }
+        }
+    }
+
+    private fun tearDownDiscovery() {
+        discovery?.stop()
+        discovery = null
+    }
+
     companion object {
         private const val TAG = "HomePingService"
         const val ACTION_STOP = "com.homeping.app.action.STOP_SERVICE"
@@ -77,7 +129,6 @@ class HomePingService : Service() {
             val intent = Intent(context, HomePingService::class.java).apply {
                 action = ACTION_STOP
             }
-            // Prefer explicit stopSelf path via startCommand; also stopService as backup.
             try {
                 context.startService(intent)
             } catch (_: Exception) {

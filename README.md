@@ -10,7 +10,7 @@ Design notes live in [`notes/`](notes/), especially [`notes/design.md`](notes/de
 
 ## Status
 
-PR3 — foreground service + notification channels. After setup (and notification permission), a quiet “HomePing is ready” notification stays up. Networking not implemented yet.
+PR4 — LAN peer discovery via mDNS/NSD (`_homeping._tcp`). Main screen shows when the other phone is seen; Settings lists discovered peers. TCP auth/ping not implemented yet.
 
 ## Requirements
 
@@ -58,10 +58,21 @@ On the phone: allow install from the computer / unknown sources as prompted.
 ```
 app/src/main/java/com/homeping/app/
   MainActivity.kt
-  ui/MainScreen.kt          # large Ping button shell
-  ui/theme/                 # high-contrast, large type
-notes/                      # product & design docs
+  service/HomePingService.kt   # FGS + discovery lifecycle
+  discovery/                   # NSD advertise/resolve, PeerDirectory
+  alert/                       # notification channels
+  data/                        # DataStore prefs
+  ui/                          # Compose screens
+notes/                         # product & design docs
 ```
+
+## Two-phone discovery check
+
+1. Install on both phones, finish setup (different names, **same PIN** for later).
+2. Allow notifications; confirm “HomePing is ready”.
+3. Same **home** Wi‑Fi (not guest / client isolation).
+4. Main screen should show the other name as **Seen on Wi‑Fi**, or check **Settings → Phones on Wi‑Fi**.
+
 
 ## Implementation plan (summary)
 

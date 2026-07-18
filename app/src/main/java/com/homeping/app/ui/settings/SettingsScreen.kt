@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -27,12 +29,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homeping.app.R
+import com.homeping.app.discovery.DiscoveredPeer
 import com.homeping.app.service.NotificationPermission
 import com.homeping.app.ui.components.LargePrimaryButton
+import com.homeping.app.ui.theme.HomePingOnline
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    discoveredPeers: List<DiscoveredPeer> = emptyList(),
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit = {},
 ) {
@@ -168,6 +173,56 @@ fun SettingsScreen(
                     text = stringResource(R.string.settings_enable_notifications),
                     onClick = onRequestNotificationPermission,
                 )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = stringResource(R.string.settings_peers_section),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_peers_help),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            if (discoveredPeers.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_peers_empty),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            } else {
+                discoveredPeers.forEach { peer ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = peer.displayName,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = HomePingOnline,
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_peer_detail,
+                                    peer.host,
+                                    peer.port,
+                                    peer.shortId,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

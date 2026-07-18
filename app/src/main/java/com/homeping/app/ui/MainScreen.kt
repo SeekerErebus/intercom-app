@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -27,16 +28,18 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.homeping.app.R
 import com.homeping.app.ui.theme.HomePingOffline
+import com.homeping.app.ui.theme.HomePingOnline
 import com.homeping.app.ui.theme.HomePingTheme
 
 /**
- * Daily home screen shell. Networking and real peer status land in later PRs;
- * layout targets one giant primary action for a two-device household.
+ * Daily home screen. Peer online state comes from LAN discovery (PR4);
+ * Ping remains disabled until transport lands.
  */
 @Composable
 fun MainScreen(
     peerName: String = stringResource(R.string.peer_placeholder),
     statusText: String = stringResource(R.string.status_not_connected),
+    peerOnline: Boolean = false,
     thisDeviceName: String = "",
     onPingClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -67,7 +70,11 @@ fun MainScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(24.dp))
-                PeerStatusCard(peerName = peerName, statusText = statusText)
+                PeerStatusCard(
+                    peerName = peerName,
+                    statusText = statusText,
+                    peerOnline = peerOnline,
+                )
             }
 
             val pingLabel = stringResource(R.string.ping_button)
@@ -116,7 +123,9 @@ fun MainScreen(
 private fun PeerStatusCard(
     peerName: String,
     statusText: String,
+    peerOnline: Boolean,
 ) {
+    val statusColor: Color = if (peerOnline) HomePingOnline else HomePingOffline
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -140,7 +149,7 @@ private fun PeerStatusCard(
             Text(
                 text = statusText,
                 style = MaterialTheme.typography.bodyLarge,
-                color = HomePingOffline,
+                color = statusColor,
             )
         }
     }
@@ -150,6 +159,11 @@ private fun PeerStatusCard(
 @Composable
 private fun MainScreenPreview() {
     HomePingTheme {
-        MainScreen(thisDeviceName = "Upstairs")
+        MainScreen(
+            thisDeviceName = "Upstairs",
+            peerName = "Downstairs",
+            statusText = "Seen on Wi‑Fi",
+            peerOnline = true,
+        )
     }
 }
