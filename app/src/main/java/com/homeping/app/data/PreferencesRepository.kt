@@ -59,6 +59,13 @@ class PreferencesRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.SETUP_COMPLETE] = complete }
     }
 
+    suspend fun setPairedPeer(peerId: String, peerName: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.PAIRED_PEER_ID] = peerId
+            prefs[Keys.PAIRED_PEER_NAME] = peerName.trim()
+        }
+    }
+
     suspend fun clearPairedPeer() {
         context.dataStore.edit { prefs ->
             prefs[Keys.PAIRED_PEER_ID] = ""

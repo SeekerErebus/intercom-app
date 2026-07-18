@@ -10,7 +10,7 @@ Design notes live in [`notes/`](notes/), especially [`notes/design.md`](notes/de
 
 ## Status
 
-PR4 — LAN peer discovery via mDNS/NSD (`_homeping._tcp`). Main screen shows when the other phone is seen; Settings lists discovered peers. TCP auth/ping not implemented yet.
+PR5 — TCP control plane on port 7529 with shared-PIN auth. After discovery, phones link automatically (lower device id dials). Main shows **Connected to …** when auth succeeds.
 
 ## Requirements
 
@@ -66,12 +66,13 @@ app/src/main/java/com/homeping/app/
 notes/                         # product & design docs
 ```
 
-## Two-phone discovery check
+## Two-phone link check
 
-1. Install on both phones, finish setup (different names, **same PIN** for later).
+1. Install on both phones, finish setup (different names, **same home PIN**).
 2. Allow notifications; confirm “HomePing is ready”.
 3. Same **home** Wi‑Fi (not guest / client isolation).
-4. Main screen should show the other name as **Seen on Wi‑Fi**, or check **Settings → Phones on Wi‑Fi**.
+4. Main should move: Looking → Seen on Wi‑Fi → Checking home PIN → **Connected to …**.
+5. Wrong PIN on one phone → auth fails / no Connected state.
 
 
 ## Implementation plan (summary)

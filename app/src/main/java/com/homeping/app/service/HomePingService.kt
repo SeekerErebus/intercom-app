@@ -13,6 +13,8 @@ import com.homeping.app.alert.HomePingNotifications
 import com.homeping.app.alert.NotificationChannels
 import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.discovery.NsdPeerDiscovery
+import com.homeping.app.net.SessionManager
+import com.homeping.app.net.SessionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,16 +23,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Keeps HomePing eligible to run while the user expects pings.
- * Owns the ready notification and LAN peer discovery (NSD).
+ * Foreground service: ready notification, mDNS discovery, TCP session + PIN auth.
  */
 class HomePingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var discovery: NsdPeerDiscovery? = null
+    private var sessionManager: SessionManager? = null
     private var prefsJob: Job? = null
     private var lastDeviceId: String = ""
     private var lastDisplayName: String = ""
+    private var lastPin: String = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -42,14 +45,14 @@ class HomePingService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 Log.i(TAG, "stop requested")
-                tearDownDiscovery()
+                tearDownNetworking()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
             else -> {
                 promoteToForeground()
-                ensureDiscoveryWatching()
+                ensurePrefsWatching()
             }
         }
         return START_STICKY
@@ -58,7 +61,7 @@ class HomePingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        tearDownDiscovery()
+        tearDownNetworking()
         prefsJob?.cancel()
         prefsJob = null
         scope.cancel()
@@ -82,37 +85,70 @@ class HomePingService : Service() {
         Log.i(TAG, "foreground started")
     }
 
-    private fun ensureDiscoveryWatching() {
+    private fun ensurePrefsWatching() {
         if (prefsJob != null) return
         val repo = PreferencesRepository.getInstance(this)
         prefsJob = scope.launch {
             repo.preferences.collect { prefs ->
-                if (!prefs.setupComplete || prefs.deviceId.isBlank()) {
-                    tearDownDiscovery()
+                if (!prefs.setupComplete || prefs.deviceId.isBlank() || prefs.homePin.isBlank()) {
+                    tearDownNetworking()
                     lastDeviceId = ""
                     lastDisplayName = ""
+                    lastPin = ""
                     return@collect
                 }
-                if (discovery == null || prefs.deviceId != lastDeviceId) {
-                    tearDownDiscovery()
+
+                val identityChanged =
+                    discovery == null ||
+                        sessionManager == null ||
+                        prefs.deviceId != lastDeviceId ||
+                        prefs.homePin != lastPin
+
+                if (identityChanged) {
+                    tearDownNetworking()
                     discovery = NsdPeerDiscovery(
                         context = this@HomePingService,
                         selfDeviceId = prefs.deviceId,
                         displayName = prefs.displayName.ifBlank { "HomePing" },
                     ).also { it.start() }
+
+                    sessionManager = SessionManager(
+                        scope = scope,
+                        onPaired = { peerId, peerName ->
+                            repo.setPairedPeer(peerId, peerName)
+                        },
+                    ).also {
+                        it.start(
+                            selfDeviceId = prefs.deviceId,
+                            selfDisplayName = prefs.displayName.ifBlank { "HomePing" },
+                            homePin = prefs.homePin,
+                            preferredPeerId = prefs.pairedPeerId,
+                        )
+                    }
                     lastDeviceId = prefs.deviceId
                     lastDisplayName = prefs.displayName
-                } else if (prefs.displayName != lastDisplayName) {
-                    discovery?.updateDisplayName(prefs.displayName.ifBlank { "HomePing" })
-                    lastDisplayName = prefs.displayName
+                    lastPin = prefs.homePin
+                } else {
+                    if (prefs.displayName != lastDisplayName) {
+                        discovery?.updateDisplayName(prefs.displayName.ifBlank { "HomePing" })
+                        lastDisplayName = prefs.displayName
+                    }
+                    sessionManager?.updateIdentity(
+                        displayName = prefs.displayName.ifBlank { "HomePing" },
+                        homePin = prefs.homePin,
+                        preferredPeerId = prefs.pairedPeerId,
+                    )
                 }
             }
         }
     }
 
-    private fun tearDownDiscovery() {
+    private fun tearDownNetworking() {
+        sessionManager?.stop()
+        sessionManager = null
         discovery?.stop()
         discovery = null
+        SessionRegistry.reset()
     }
 
     companion object {

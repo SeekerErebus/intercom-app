@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homeping.app.R
 import com.homeping.app.discovery.DiscoveredPeer
+import com.homeping.app.net.ConnectionStatus
 import com.homeping.app.service.NotificationPermission
 import com.homeping.app.ui.components.LargePrimaryButton
 import com.homeping.app.ui.theme.HomePingOnline
@@ -38,6 +39,7 @@ import com.homeping.app.ui.theme.HomePingOnline
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     discoveredPeers: List<DiscoveredPeer> = emptyList(),
+    linkStatus: ConnectionStatus = ConnectionStatus.Idle,
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit = {},
 ) {
@@ -174,6 +176,32 @@ fun SettingsScreen(
                     onClick = onRequestNotificationPermission,
                 )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = stringResource(R.string.settings_link_section),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when (val s = linkStatus) {
+                    is ConnectionStatus.Authenticated ->
+                        stringResource(R.string.settings_link_connected, s.peerName)
+                    is ConnectionStatus.Connecting ->
+                        stringResource(R.string.status_connecting, s.peerName)
+                    is ConnectionStatus.Handshaking ->
+                        stringResource(R.string.status_handshaking, s.peerName)
+                    is ConnectionStatus.Failed ->
+                        stringResource(R.string.status_auth_failed, s.reason)
+                    else -> stringResource(R.string.settings_link_idle)
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (linkStatus is ConnectionStatus.Authenticated) {
+                    HomePingOnline
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
             Text(

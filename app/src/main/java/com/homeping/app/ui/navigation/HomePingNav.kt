@@ -21,6 +21,8 @@ import com.homeping.app.R
 import com.homeping.app.data.PreferencesRepository
 import com.homeping.app.data.UserPreferences
 import com.homeping.app.discovery.PeerDirectory
+import com.homeping.app.net.ConnectionStatus
+import com.homeping.app.net.SessionRegistry
 import com.homeping.app.service.NotificationPermission
 import com.homeping.app.service.ServiceLifecycle
 import com.homeping.app.ui.MainScreen
@@ -49,6 +51,7 @@ fun HomePingNav() {
         ),
     )
     val peers by PeerDirectory.peers.collectAsStateWithLifecycle()
+    val linkStatus by SessionRegistry.status.collectAsStateWithLifecycle()
 
     var ready by remember { mutableStateOf(false) }
     LaunchedEffect(repository) {
@@ -106,24 +109,44 @@ fun HomePingNav() {
         }
         composable(Routes.MAIN) {
             val displayName = prefs.displayName
-            val peerOnline = primaryPeer != null
-            val peerName = primaryPeer?.displayName
+            val authenticated = linkStatus as? ConnectionStatus.Authenticated
+            val peerName = authenticated?.peerName
+                ?: primaryPeer?.displayName
                 ?: prefs.pairedPeerName.takeIf { it.isNotBlank() }
                 ?: stringResource(R.string.peer_placeholder)
+            val peerOnline = authenticated != null || primaryPeer != null
             val statusText = when {
                 !prefs.setupComplete -> stringResource(R.string.status_not_connected)
                 !NotificationPermission.hasPostNotifications(context) ->
                     stringResource(R.string.status_need_notifications)
-                peerOnline -> stringResource(
-                    R.string.status_peer_online,
-                    primaryPeer!!.host,
-                )
+                linkStatus is ConnectionStatus.Authenticated ->
+                    stringResource(R.string.status_connected, authenticated!!.peerName)
+                linkStatus is ConnectionStatus.Connecting ->
+                    stringResource(
+                        R.string.status_connecting,
+                        (linkStatus as ConnectionStatus.Connecting).peerName,
+                    )
+                linkStatus is ConnectionStatus.Handshaking ->
+                    stringResource(
+                        R.string.status_handshaking,
+                        (linkStatus as ConnectionStatus.Handshaking).peerName,
+                    )
+                linkStatus is ConnectionStatus.Failed ->
+                    stringResource(
+                        R.string.status_auth_failed,
+                        (linkStatus as ConnectionStatus.Failed).reason,
+                    )
+                primaryPeer != null ->
+                    stringResource(R.string.status_peer_online, primaryPeer.host)
                 else -> stringResource(R.string.status_looking)
             }
+            // Connected counts as online (green); discovered-only also green; failed soft.
+            val showOnline = authenticated != null ||
+                (primaryPeer != null && linkStatus !is ConnectionStatus.Failed)
             MainScreen(
                 peerName = peerName,
                 statusText = statusText,
-                peerOnline = peerOnline,
+                peerOnline = showOnline && peerOnline,
                 thisDeviceName = displayName,
                 onPingClick = { /* PR6 */ },
                 onSettingsClick = {
@@ -138,6 +161,7 @@ fun HomePingNav() {
             SettingsScreen(
                 viewModel = settingsViewModel,
                 discoveredPeers = peers,
+                linkStatus = linkStatus,
                 onBack = { navController.popBackStack() },
                 onRequestNotificationPermission = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
